@@ -1,4 +1,4 @@
-/* Author Bharath Chandra Elluru, Siva Pramod Bobbilli.
+/* Author Bharath Chandra Elluru.
 *Date:03/26/2014, Version:1.0.
 *This program is implementing quash shell which mimics 
 *some of the functionalities of bash shell.
