@@ -1,0 +1,105 @@
+The path from which the unit files can be loaded are
+
+/etc/systemd/system and
+/lib/systemd/system
+
+/etc/systemd/system has preference over /lib/systemd/system, i.e, if a target file is present in both paths, then the target file from /etc path is read.
+
+The target file systemd loads once it boots is default.target which would be a symlink for graphical.target or multi-user.target
+
+So The first target file could be a graphical.target or multi-user.target
+Then we can find dependencies between target files using Requires and Wants variable in target file
+If a unit file is listed under Requires and After variables then that unit has to be started before the configured unit file loads and starts running
+If a unit file is listed under Requires variable then it has to load before the configured unit loads. If the listed unit fails to load then the configured unit will also not be loaded.
+If a unit file is listed under Wants variable even then it has to load before the configured unit loads but it has no effect on configured file even if the listed file fails to load correctly.
+
+Last step would be to look into targetname.target.wants folder in both of the paths and list down the unit files which are present in those folders that would also load when system boots up.
+
+After this check if there are any target files under targetname.target.wants directories and repeat the above process for those
+
+So for eg in master node:
+default.target is a symlink for graphical.target
+
+graphical.target requires multi-user.target and After=multi-user.target
+
+multi-user.target requires basic.target and After=basic.target so basic.target will be loaded for sure. This even has Ater=rescue.service and rescue.target, so if these units are also started in parallel then these will load first and then the basic.target loads.
+
+rescue.target Requires=sysinit.target rescue.service and also After=sysinit.target rescue.service, so these two units will be loaded for sure.
+
+basic.target Requires sysinit.target , Wants sockets.target timers.target and paths.target and it has After for all of the 4 units. So all of the 4 units will be loaded for sure.
+
+sysinit.target Wants=local-fs.target and swap.target and After=local-fs.target swap.target emergency.service and emergency.target, so local-fs.target and swap.target will load for sure and emergency.service and emergency.target may load.
+
+sockets.target Requires or wants nothing, so this would be end of this branch, no need to look further
+
+timers.target Requires or wants nothing, so this would be end of this branch, no need to look further
+
+paths.target Requires or wants nothing, so this would be end of this branch, no need to look further
+
+local-fs.target is After=local-fs-pre.target, so local-fs-pre.target may load.
+
+local-fs-pre.target
+    This target unit is automatically ordered before all local mount points marked with auto (see above). It can be used to execute certain units before all local mounts.
+This target is called by systemd-remount-fs.service using Wants keyword.
+
+swap.target Requires or wants nothing, so this would be end of this branch, no need to look further
+
+local-fs-pre.target Requires or wants nothing, so this would be end of this branch, no need to look further
+
+
+multiuser.target.wants
+under /etc path
+avahi-daemon.service   busybox-syslog.service  lighttpd.service  ntpd.service	   rpcbind.service
+busybox-klogd.service  hvac-master.service     network.service	 remote-fs.target  sshdgenkeys.service
+
+under /lib path
+dbus.service  getty.target  systemd-ask-password-wall.path  systemd-logind.service  systemd-user-sessions.service
+
+basic.target.wants
+machineid.service  run-postinsts.service
+
+sysinit.target.wants
+dev-hugepages.mount		   sys-fs-fuse-connections.mount      systemd-journal-flush.service   systemd-udev-trigger.service
+dev-mqueue.mount		   sys-kernel-config.mount	      systemd-journald.service	      systemd-udevd.service
+machineid.service		   sys-kernel-debug.mount	      systemd-modules-load.service
+proc-sys-fs-binfmt_misc.automount  systemd-ask-password-console.path  systemd-sysctl.service
+run-postinsts.service		   systemd-binfmt.service	      systemd-tmpfiles-setup.service
+
+sockets.target.wants
+dbus.socket		systemd-journald.socket   systemd-udevd-control.socket
+systemd-initctl.socket	systemd-shutdownd.socket  systemd-udevd-kernel.socket
+
+timers.target.wants
+systemd-tmpfiles-clean.timer
+
+local-fs.target.wants
+systemd-fsck-root.service  systemd-remount-fs.service  tmp.mount
+
+Two target files are remote-fs.target and getty.target which would be loaded for sure.
+
+Both of the target files Requires or wants nothing, so this would be end of this branch, no need to look further
+
+
+getty.target.wants
+getty@tty1.service  serial-getty@ttyO2.service
+
+sound.target would load automatically if an audio card is present on the device, so on gumstix sound card is present so this unit file would be loaded
+
+network.target would be loaded by default on every device for supporting network connections
+
+
+The processes that would start on system boot up are listed in each of the service file under Exec variable.
+
+
+
+
+
+
+
+
+
+ Example: if a service getty@tty3.service is requested and no file by that name is found, systemd will look for getty@.service and instantiate a service from that configuration file if it is found.
+
+
+If a unit file is empty (i.e. has the file size 0) or is symlinked to /dev/null, its configuration will not be loaded and it appears with a load state of "masked", and cannot be activated. Use this as an effective way to fully disable a unit, making it impossible to start it even manually.
+
